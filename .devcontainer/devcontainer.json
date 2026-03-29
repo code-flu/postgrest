@@ -1,0 +1,5 @@
+{
+  "name": "PostgREST Nix",
+  "image": "ubuntu:24.04",
+  "postCreateCommand": "apt-get update && apt-get install -y curl xz-utils git && curl -L https://nixos.org/nix/install | sh -s -- --no-daemon && . ~/.nix-profile/etc/profile.d/nix.sh && echo 'experimental-features = nix-flakes nix-command' >> ~/.config/nix/nix.conf && nix-env -iA cachix -f https://cachix.org/api/v1/install && cachix use postgrest"
+}

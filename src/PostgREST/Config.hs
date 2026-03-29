@@ -101,6 +101,7 @@ data AppConfig = AppConfig
   , configJWKS                     :: Maybe JwkSet
   , configJwtAudience              :: Maybe Text
   , configJwtRoleClaimKey          :: JSPath
+  , configJwtSchemaClaimKey        :: Maybe JSPath
   , configJwtSecret                :: Maybe BS.ByteString
   , configJwtSecretIsBase64        :: Bool
   , configJwtCacheMaxEntries       :: Int
@@ -184,7 +185,8 @@ toText conf =
       ,("db-tx-end",                 q . showTxEnd)
       ,("db-uri",                    q . configDbUri)
       ,("jwt-aud",                   q . fromMaybe mempty . configJwtAudience)
-      ,("jwt-role-claim-key",        q . T.intercalate mempty . fmap dumpJSPath . configJwtRoleClaimKey)
+      ,("jwt-role-claim-key",        q . T.intercalate mempty . fmap dumpJSPath . configJwtRoleClaimKey)    
+      ,("jwt-schema-claim-key",      q . maybe mempty (T.intercalate mempty . fmap dumpJSPath) . configJwtSchemaClaimKey)      
       ,("jwt-secret",                q . T.decodeUtf8 . showJwtSecret)
       ,("jwt-secret-is-base64",          T.toLower . show . configJwtSecretIsBase64)
       ,("jwt-cache-max-entries",         show . configJwtCacheMaxEntries)
@@ -297,6 +299,7 @@ parser optPath env dbSettings roleSettings roleIsolationLvl =
     <*> pure Nothing
     <*> optStringOrURI "jwt-aud"
     <*> parseRoleClaimKey "jwt-role-claim-key" "role-claim-key"
+    <*> parseSchemaClaimKey "jwt-schema-claim-key" "schema-claim-key"
     <*> (fmap encodeUtf8 <$> optString "jwt-secret")
     <*> (fromMaybe False <$> optWithAlias
           (optBool "jwt-secret-is-base64")
@@ -417,6 +420,12 @@ parser optPath env dbSettings roleSettings roleIsolationLvl =
       optWithAlias (optString k) (optString al) >>= \case
         Nothing  -> pure [JSPKey "role"]
         Just rck -> either (fail . show) pure $ pRoleClaimKey rck
+
+    parseSchemaClaimKey :: C.Key -> C.Key -> C.Parser C.Config (Maybe JSPath)
+    parseSchemaClaimKey k al =
+      optWithAlias (optString k) (optString al) >>= \case
+        Nothing  -> pure Nothing
+        Just rck -> either (fail . show) (pure . Just) $ pRoleClaimKey rck
 
     parseCORSAllowedOrigins k =
       optString k >>= \case

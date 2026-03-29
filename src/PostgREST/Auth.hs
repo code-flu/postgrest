@@ -23,10 +23,11 @@ import qualified Data.Vault.Lazy                 as Vault
 import qualified Network.HTTP.Types.Header       as HTTP
 import qualified Network.Wai                     as Wai
 import qualified Network.Wai.Middleware.HttpAuth as Wai
+import qualified Data.CaseInsensitive            as CI
 
-import Data.List        (lookup)
-import PostgREST.TimeIt (timeItT)
-import System.IO.Unsafe (unsafePerformIO)
+import Data.List          (lookup)
+import PostgREST.TimeIt   (timeItT)
+import System.IO.Unsafe   (unsafePerformIO)
 
 import PostgREST.AppState      (AppState, getConfig, getJwtCacheState,
                                 getTime)
@@ -56,8 +57,15 @@ middleware appState app req respond = do
     else do
       authResult <- parseJwt
       pure $ req { Wai.vault = Wai.vault req & Vault.insert authResultKey authResult }
+  
+  let req'' = case rightToMaybe =<< getResult req' of
+        Just AuthResult{authSchema = Just schema} ->
+          req' { Wai.requestHeaders =
+                    (CI.mk "Accept-Profile", encodeUtf8 schema)
+                    : filter ((/= CI.mk "Accept-Profile") . fst) (Wai.requestHeaders req') }
+        _ -> req'
 
-  app req' respond
+  app req'' respond
 
 authResultKey :: Vault.Key (Either Error AuthResult)
 authResultKey = unsafePerformIO Vault.newKey

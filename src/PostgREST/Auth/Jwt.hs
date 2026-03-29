@@ -109,16 +109,35 @@ parseToken secret tkn = do
       -- Control never reaches here, the decode function only returns the above three
       jwtDecodeError _                    = JwtDecodeErr UnreachableDecodeError
 
+-- parseClaims :: (MonadError Error m, MonadIO m) => AppConfig -> UTCTime -> JSON.Object -> m AuthResult
+-- parseClaims cfg@AppConfig{configJwtRoleClaimKey, configJwtSchemaClaimKey, configDbAnonRole} time mclaims = do
+--   validateClaims time (audMatchesCfg cfg) mclaims
+--   -- role defaults to anon if not specified in jwt
+--   role <- liftEither . maybeToRight (JwtErr JwtTokenRequired) $
+--     unquoted <$> walkJSPath (Just $ JSON.Object mclaims) configJwtRoleClaimKey <|> configDbAnonRole
+--   pure AuthResult
+--            { authClaims = mclaims
+--            , authRole = role
+--            }
+--   where
+--     unquoted :: JSON.Value -> BS.ByteString
+--     unquoted (JSON.String t) = encodeUtf8 t
+--     unquoted v               = LBS.toStrict $ JSON.encode v
+
 parseClaims :: (MonadError Error m, MonadIO m) => AppConfig -> UTCTime -> JSON.Object -> m AuthResult
-parseClaims cfg@AppConfig{configJwtRoleClaimKey, configDbAnonRole} time mclaims = do
+parseClaims cfg@AppConfig{configJwtRoleClaimKey, configJwtSchemaClaimKey, configDbAnonRole} time mclaims = do
   validateClaims time (audMatchesCfg cfg) mclaims
-  -- role defaults to anon if not specified in jwt
   role <- liftEither . maybeToRight (JwtErr JwtTokenRequired) $
     unquoted <$> walkJSPath (Just $ JSON.Object mclaims) configJwtRoleClaimKey <|> configDbAnonRole
+  let mSchema = do
+        path <- configJwtSchemaClaimKey
+        JSON.String s <- walkJSPath (Just $ JSON.Object mclaims) path
+        pure s
   pure AuthResult
-           { authClaims = mclaims
-           , authRole = role
-           }
+    { authClaims = mclaims
+    , authRole   = role
+    , authSchema = mSchema
+    }
   where
     unquoted :: JSON.Value -> BS.ByteString
     unquoted (JSON.String t) = encodeUtf8 t
